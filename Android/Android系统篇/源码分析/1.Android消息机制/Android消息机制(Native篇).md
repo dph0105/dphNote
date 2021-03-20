@@ -16,7 +16,14 @@ MessageQueue(boolean quitAllowed) {
 ```
 
 
+
+
+
+
+
+
 ```c++
+
 //framework/base/core/jni/android_os_MessageQueue.cpp
 static jlong android_os_MessageQueue_nativeInit(JNIEnv* env, jclass clazz) {
     NativeMessageQueue* nativeMessageQueue = new NativeMessageQueue();
