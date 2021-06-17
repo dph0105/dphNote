@@ -82,7 +82,7 @@ void Looper::setForThread(const sp<Looper>& looper) {
 
 NativeMessageQueue的构造函数获取尝试从线程局部变量TLS中获取Looper，若没有则创建并设入线程局部变量TLS中，**此Looper为native层的Looper，与Java层的Looper没有关系！** 
 
-注：TLS，(Thread Local Storage 线程局部变量)，多个线程共用一个key，线程只能访问自己的值
+注：TLS，(Thread Local Storage 线程局部变量)，多个线程共用一个key，每个线程只能访问自己的值
 
 
 

@@ -1,0 +1,80 @@
+### Flutter启动流程
+
+#### 初始化
+
+FlutterActivity的onCreate方法中先会构造FlutterEngine对象，FlutterEngine构造方法中会实例化一些MethodChannel方法通道，然后会执行FlutterLoader的后台初始化操作，FlutterLoader初始化会加载libflutter.so文件，然后将apk包中assets中dart环境内容文件解压到内部存储中，之后会将启动dart虚拟机的参数和目录通过FlutterJni.nativeInit方法传递到Native创建FlutterMain对象初始化。在之后调用FlutterJNI.attachToNative方法创建AndroidShellHolder返回引用值保存。
+
+AndroidShellHolder对象构造时会创建UI，GPU，IO三个线程，线程中创建了MessageQueue执行事件循环，在Android环境下MessageQueue内部使用了Android的Loop事件循环，并构造了一个timer_fd，当有事件请求时会通过向timer_fd发送时间事件触发Loop事件处理。
+
+在AndroidShellHolder创建完线程后，会调用Shell.Create创建Dart虚拟机，Shell对象，platform_view对象,Rasterizer对象，Engine对象，ShellIoManager对象。
+
+##### Dart
+
+
+
+##### Shell
+
+Shell对象负责处理engine，platform_view，rasterizer对象之间的沟通
+
+##### PlatformView
+
+platform_view对象负责处理android端逻辑
+
+##### Engine
+
+Engine对象负责处理Dart虚拟机逻辑
+
+##### Rasterizer
+
+Rasterizer对象负责将Engine传递过来的layer_tree绘制到platform_view创建的surface中显示
+
+##### 传递Surface
+
+FlutterActivity的中会将SurfaceView或者TextureView传递设置到Window中，当他们被创建时，会获取surface对象的NativeWindow将他传递到native的platformViewAndroid的Surface对象中
+
+#### 启动
+
+FlutterActivity的onStart方法会将启动入口参数传递给Engine，执行Engine.Run方法。
+
+Engine.Run的启动先获取DartIsolate对象，通过DartIsolate调用Run方法启动
+
+### Flutter生命周期
+
+flutter框架有Widget、Element和RenderObject三个树结构对象。
+
+Widget树是一颗虚拟的配置树，用于描述Element的配置
+
+Element树是一颗表示Widget层级关系的树，负责处理Widget参数和构造RenderObject树
+
+RenderObejct树是一颗有绘制能力的对象树
+
+在flutter启动时，会调用runApp方法，将Widget树通过mount解析成Elment和RenderObject树。
+
+### Flutter绘制流程
+
+flutter绘制是由垂直同步信号触发的，当android端触发垂直同步信号时，flutter端会执行handleDrawFrame方法，方法中会调用RenderBindning.drawFrame方法，drawFrame方法中会调用PipelineOnwer的flushLayout、flushPaint方法。
+
+flushLayout方法会遍历_nodesNeedingLayout数组，调用RenderObject._layoutWithoutResize方法，_layoutWithoutResize方法中会调用pefromLayout方法进行该RenderObject的绘制大小
+
+flushPaint方法会遍历_nodesNeedingPaint数组，调用RenderObject的_paintWithContext方法，将当前RenderObject的内容通过Canvas绘制到pictureLayer的picture中
+
+在pipelineOnwer绘制完成后，会调用RenderView的compositeFrame方法构造Scene场景对象发送到rasterizer对象绘制，rasterizer会将scene中的LayerTree绘制到platform_view传递上来的surface里面
+
+### Flutter事件传递流程
+
+首先Android的触摸事件会通过AndroidTouchProcessor传递到Flutter的GestureBinding的pendingPointerEvents队列中，该队列中的数据会被采样执行。
+
+执行时会调用_handlePointerEvent方法，当事件类型是按下类型时，会调用RenderView的hitTest方法，遍历当前的RenderObject树将能响应的HitTestEntry添加到HitTestResult保存。最后GestureBinding自己也会生成HitTestEntry添加到hitTestResult中。当事件类型不是按下类型时，会从保存的hitTests数组中根据event.pointer值来获取hitTestResult。
+
+获取到hitTestResult后，GestureBinding会执行dispatchEvent方法，该方法会遍历上面获取的HitTestEntry数组，执行entry的target.handleEvent方法
+
+#### GestureRecognizer
+
+GestureDetector手势动作识别Widget中使用RenderPointerListener类型的RenderObject，该RenderObject的handleEvent方法执行了onPointerDown方法，会触发GestureRecognizer的addPointer方法。该方法会判断点击事件能否被处理，能的话，会将当前的GestureRecognizer的handleEvnet方法注册到PointRouter的_routerMap中。并将GestureRecognier注册到GeStureArenaManager的_arenas中。
+
+当处理到GestureBinding的handleEvent方法时，会调用pointerRouter.route方法将事件传递到GestureRecognizer的handleEvent方法中。
+
+在GestureBinding的handleEvent方法最后会调用GestureBinding的Close和sweep方法。
+
+#### Flutter使用本地View
+
